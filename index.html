@@ -390,7 +390,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     return (sets || []).filter(function (s) { return s.w || s.r; }).map(function (s) {
       var w = s.w ? (/^\d+([.,]\d+)?$/.test(s.w) ? s.w + ' кг' : s.w) : '';
       return w && s.r ? w + ' × ' + s.r : (w || s.r + ' раз');
-    }).join(', ');
+    }).join(' / ');
   }
   function restSeconds(s) {
     s = String(s || '').toLowerCase().replace(',', '.');

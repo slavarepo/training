@@ -12,6 +12,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
 <style>
   :root {
     --bg: #0b0c0f; --card: #1e2127; --card2: #2b2f37; --line: #383d47;
@@ -185,36 +188,39 @@
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .pair.single .ex { grid-column: 1 / -1; }
   .group.superset .ex + .ex { margin-top: 0; }
-  .ex { position: relative; border-radius: var(--radius); background: color-mix(in srgb, var(--card) 92%, transparent);
-    border: 1px solid var(--line); transition: background .2s, color .2s; overflow: hidden; }
+  .ex { position: relative; border-radius: var(--radius); overflow: hidden; border: 0;
+    background: var(--tile); color: var(--tile-ink); }
+  .ex.c-blue { --tile: var(--blue); --tile-ink: #ffffff; }
+  .ex.c-green { --tile: var(--accent); --tile-ink: var(--accent-ink); }
+  .ex.c-gray { --tile: #30343c; --tile-ink: var(--text); }
   .ex:not(.open) { cursor: pointer; }
-  .ex:not(.open):active { transform: scale(.985); }
-  .ex[data-state="partial"]:not(.open) { background: var(--blue); color: var(--blue-ink); border-color: var(--blue); }
-  .ex[data-state="done"]:not(.open) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  .ex.open { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .ex:not(.open):active { filter: brightness(.93); }
+  .ex.open { grid-column: 1 / -1; background: var(--card); color: var(--text); }
+  .pair.has-open .ex:not(.open) { display: none; }
 
-  .face { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 14px; min-height: 150px; }
-  .ex.open .face { align-items: center; }
+  .face { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 14px; height: 186px; background: var(--tile); color: var(--tile-ink); }
   .face-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  .face .thumb { width: 46px; height: 46px; border-radius: 50%; }
+  .face .thumb { width: 42px; height: 42px; border-radius: 50%; }
   .face .thumb .play svg { width: 16px; height: 16px; }
-  .face .ph { width: 46px; height: 46px; border-radius: 50%; background: var(--card2); }
-  .round { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto;
-    border: 1px solid color-mix(in srgb, currentColor 30%, transparent); }
+  .face .ph { width: 42px; height: 42px; border-radius: 50%; background: color-mix(in srgb, currentColor 14%, transparent); }
+  .round { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto;
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
   .round svg { width: 16px; height: 16px; }
   .face-main { margin-top: auto; min-width: 0; }
-  .face h3 { margin: 4px 0 0; font-size: 16px; line-height: 1.2; font-weight: 650;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .face-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-top: 8px; }
-  .face-meta b { font-size: 20px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
-  .face-meta .prog { font-size: 13px; font-weight: 700; opacity: .85; white-space: nowrap; }
-  .face-sub { font-size: 13px; opacity: .72; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ex:not(.open) .num { background: color-mix(in srgb, currentColor 16%, transparent); color: inherit; }
-  .ex[data-state="none"]:not(.open) .num { background: var(--accent); color: var(--accent-ink); }
+  .face h3 { margin: 6px 0 0; font-size: 15px; line-height: 1.2; font-weight: 700;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .face-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; }
+  .face-meta b { font-size: 22px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+  .prog { font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+    background: color-mix(in srgb, currentColor 16%, transparent); }
+  .prog:empty { display: none; }
+  .face-sub { font-size: 13px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ex .num { background: color-mix(in srgb, currentColor 16%, transparent); color: inherit; }
 
   .ex .body { display: none; }
-  .ex.open .body { display: block; }
-  .ex.open .face { flex-direction: row; align-items: center; min-height: 0; padding-bottom: 10px; }
+  .ex.open .body { display: block; animation: bodyIn .3s ease both; }
+  @keyframes bodyIn { from { opacity: 0; transform: translateY(-8px); } }
+  .ex.open .face { flex-direction: row; align-items: center; height: auto; padding: 12px 14px; }
   .ex.open .face-top { order: 3; margin-left: auto; }
   .ex.open .face-top .thumb, .ex.open .face-top .ph { display: none; }
   .ex.open .face-main { margin-top: 0; flex: 1; }
@@ -223,11 +229,16 @@
   .ex.open .open-thumb { display: block; }
   .open-thumb { display: none; }
   .ex.open .face > .open-thumb .thumb { width: 56px; height: 56px; border-radius: 14px; }
-  .body .specs { margin-top: 2px; }
+  .ex.open .player { padding-top: 12px; }
+  .body .specs { margin-top: 12px; }
   .spec { background: var(--card2); }
   .round .ico-close { display: none; }
   .ex.open .round .ico-open { display: none; }
   .ex.open .round .ico-close { display: block; }
+  ::view-transition-group(*) { animation-duration: .34s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+  body, button, input, textarea { font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  .top h1 { font-weight: 800; letter-spacing: -.02em; }
+  .tab { font-weight: 700; }
 </style>
 </head>
 <body>
@@ -284,6 +295,18 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
 
   var ICON_ARROW = '<svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>' +
     '<svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+  // шашечка: синий, зелёный, серый — по кругу, ряды по 2 плитки
+  var TILE_COLORS = ['c-blue', 'c-green', 'c-gray'];
+  var tileIdx = 0;
+  function vt(fn) {
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (document.startViewTransition && !reduce) {
+      try { return document.startViewTransition(fn).finished.catch(function () {}); } catch (e) {}
+    }
+    fn();
+    return Promise.resolve();
+  }
 
   var $ = function (s, el) { return (el || document).querySelector(s); };
   var $$ = function (s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); };
@@ -396,6 +419,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     }
 
     // группируем 1а/1б в суперсеты
+    tileIdx = 0;
     var groups = [];
     (w.exercises || []).forEach(function (ex) {
       var g = (String(ex.num).match(/^\d+/) || [ex.num || ex.name])[0];
@@ -428,7 +452,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     if (isAuth()) (w.exercises || []).forEach(function (ex) { initCard(ex, w); });
     if (state.openKey) {
       var o = $('.ex[data-key="' + cssEsc(state.openKey) + '"]');
-      if (o) o.classList.add('open');
+      if (o) { o.classList.add('open'); o.parentNode.classList.add('has-open'); }
     }
   }
 
@@ -456,7 +480,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     return (sets || []).filter(function (s) { return s.w || s.r; }).map(function (s) {
       var w = s.w ? (/^\d+([.,]\d+)?$/.test(s.w) ? s.w + ' кг' : s.w) : '';
       return w && s.r ? w + ' × ' + s.r : (w || s.r + ' раз');
-    }).join(', ');
+    }).join(' / ');
   }
   function restSeconds(s) {
     s = String(s || '').toLowerCase().replace(',', '.');
@@ -491,7 +515,8 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var total = nSets(ex);
     var filled = ex.log ? (ex.log.sets || []).filter(function (s) { return s.w || s.r; }).length : 0;
     var st = !isAuth() || !filled ? 'none' : (filled >= total ? 'done' : 'partial');
-    return '<article class="ex" data-key="' + esc(ex.key) + '" data-state="' + st + '">' +
+    var idx = tileIdx++;
+    return '<article class="ex ' + TILE_COLORS[idx % 3] + '" style="view-transition-name:tile-' + idx + '" data-key="' + esc(ex.key) + '" data-state="' + st + '">' +
       '<div class="face ex-head">' +
         '<div class="open-thumb">' + (ex.yt ? thumb(ex) : '') + '</div>' +
         '<div class="face-top">' + (ex.yt ? thumb(ex) : '<span class="ph"></span>') +
@@ -579,13 +604,12 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
   }
 
   function openTile(el) {
-    $$('.ex.open').forEach(function (o) { if (o !== el) closeTile(o); });
-    el.classList.add('open');
-    state.openKey = el.getAttribute('data-key');
-    setTimeout(function () {
-      var top = el.getBoundingClientRect().top + window.scrollY - ($('header').offsetHeight + 10);
-      window.scrollTo({ top: top, behavior: 'smooth' });
-    }, 30);
+    vt(function () {
+      $$('.ex.open').forEach(function (o) { if (o !== el) closeTile(o); });
+      el.classList.add('open');
+      el.parentNode.classList.add('has-open');
+      state.openKey = el.getAttribute('data-key');
+    }).then(function () { scrollToTile(el); });
   }
   function closeTile(el) {
     var card = state.cards[el.getAttribute('data-key')];
@@ -593,7 +617,12 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var p = el.querySelector(':scope > .player');
     if (p) { p.remove(); $$('.thumb.open', el).forEach(function (b) { b.classList.remove('open'); }); }
     el.classList.remove('open');
+    el.parentNode.classList.remove('has-open');
     if (state.openKey === el.getAttribute('data-key')) state.openKey = null;
+  }
+  function scrollToTile(el) {
+    var r = el.getBoundingClientRect(), hh = $('header').offsetHeight;
+    if (r.top < hh + 4 || r.top > window.innerHeight * 0.45) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
   }
 
   function collect(card) {
@@ -723,9 +752,10 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var exEl = t.closest('.ex');
     if (exEl && !exEl.classList.contains('open')) { openTile(exEl); return; }
     if (exEl && t.closest('[data-act="toggle"]')) {
-      closeTile(exEl);
-      var r = exEl.getBoundingClientRect(), hh = $('header').offsetHeight;
-      if (r.top < hh) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
+      vt(function () { closeTile(exEl); }).then(function () {
+        var r = exEl.getBoundingClientRect(), hh = $('header').offsetHeight;
+        if (r.top < hh) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
+      });
       return;
     }
 
