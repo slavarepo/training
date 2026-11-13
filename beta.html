@@ -231,7 +231,13 @@
     filter: grayscale(1) contrast(1.08) brightness(.95); }
   .face::after { content: ""; position: absolute; inset: 0; z-index: -1;
     background: linear-gradient(180deg, color-mix(in srgb, var(--tile) 50%, transparent) 0%, color-mix(in srgb, var(--tile) 78%, transparent) 38%, var(--tile) 66%); }
-  .ex.open .face::after { background: linear-gradient(90deg, var(--tile) 35%, color-mix(in srgb, var(--tile) 70%, transparent)); }
+  /* раскрытая плитка: превью справа, градиент начинает убывать от левого края картинки */
+  .ex.open .face { min-height: 118px; }
+  .ex.open .face::before { left: 42%; filter: saturate(.75) contrast(1.05); background-position: center 35%; }
+  .ex.open .face::after { background: linear-gradient(90deg, var(--tile) 42%, color-mix(in srgb, var(--tile) 55%, transparent) 60%, color-mix(in srgb, var(--tile) 15%, transparent) 100%); }
+  .ex.open .face-main { max-width: 58%; }
+  .ex.open .face-top { align-self: flex-start; }
+  .ex.open .face-top .round:not(.open) { background: color-mix(in srgb, var(--tile) 70%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
   .face-top .btns { display: flex; gap: 8px; }
   .play-btn { background: color-mix(in srgb, var(--tile-ink) 18%, transparent); border-color: transparent; }
   .play-btn svg { width: 14px; height: 14px; margin-left: 2px; }
