@@ -222,13 +222,20 @@
   @keyframes bodyIn { from { opacity: 0; transform: translateY(-8px); } }
   .ex.open .face { flex-direction: row; align-items: center; height: auto; padding: 12px 14px; }
   .ex.open .face-top { order: 3; margin-left: auto; }
-  .ex.open .face-top .thumb, .ex.open .face-top .ph { display: none; }
   .ex.open .face-main { margin-top: 0; flex: 1; }
   .ex.open .face h3 { font-size: 19px; -webkit-line-clamp: unset; }
   .ex.open .face-meta, .ex.open .face-sub { display: none; }
-  .ex.open .open-thumb { display: block; }
-  .open-thumb { display: none; }
-  .ex.open .face > .open-thumb .thumb { width: 56px; height: 56px; border-radius: 14px; }
+  /* превью видео фоном плитки + градиент цвета плитки */
+  .face { position: relative; isolation: isolate; overflow: hidden; }
+  .face::before { content: ""; position: absolute; inset: 0; z-index: -2; background: var(--img, none) center 30% / cover no-repeat;
+    filter: grayscale(1) contrast(1.08) brightness(.95); }
+  .face::after { content: ""; position: absolute; inset: 0; z-index: -1;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--tile) 50%, transparent) 0%, color-mix(in srgb, var(--tile) 78%, transparent) 38%, var(--tile) 66%); }
+  .ex.open .face::after { background: linear-gradient(90deg, var(--tile) 35%, color-mix(in srgb, var(--tile) 70%, transparent)); }
+  .face-top .btns { display: flex; gap: 8px; }
+  .play-btn { background: color-mix(in srgb, var(--tile-ink) 18%, transparent); border-color: transparent; }
+  .play-btn svg { width: 14px; height: 14px; margin-left: 2px; }
+  .play-btn.open { background: var(--tile-ink); color: var(--tile); }
   .ex.open .player { padding-top: 12px; }
   .body .specs { margin-top: 12px; }
   .spec { background: var(--card2); }
@@ -295,6 +302,22 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
 
   var ICON_ARROW = '<svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>' +
     '<svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+  // превью для фона плитки: вертикальное (у шортсов), иначе обычное
+  function bgUrl(id) { return 'https://i.ytimg.com/vi/' + id + '/' + (store.get('oar|' + id, false) ? 'oardefault' : 'hqdefault') + '.jpg'; }
+  function upgradeBgs() {
+    $$('.ex[data-yt]').forEach(function (el) {
+      var id = el.getAttribute('data-yt');
+      if (store.get('oar|' + id, null) !== null) return;
+      var img = new Image();
+      img.onload = function () {
+        var ok = img.naturalWidth > 200;
+        store.set('oar|' + id, ok);
+        if (ok) $('.face', el).style.setProperty('--img', 'url("' + bgUrl(id) + '")');
+      };
+      img.src = 'https://i.ytimg.com/vi/' + id + '/oardefault.jpg';
+    });
+  }
 
   // шашечка: синий, зелёный, серый — по кругу, ряды по 2 плитки
   var TILE_COLORS = ['c-blue', 'c-green', 'c-gray'];
@@ -404,7 +427,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       var wkey = 'wu|' + d.title + '|' + w.label;
       var checked = store.get(wkey, {});
       var nDone = w.warmup.filter(function (_, i) { return checked[i]; }).length;
-      var openWarm = store.get('wuopen', true);
+      var openWarm = !!state.wuOpen;
       html += '<details class="warm" ' + (openWarm ? 'open' : '') + ' data-wkey="' + esc(wkey) + '">' +
         '<summary><h2>Разминка</h2><span class="pill ' + (nDone === w.warmup.length ? 'done' : '') + '" id="wu-count">' + nDone + '/' + w.warmup.length + '</span>' + ICON_CHEV + '</summary>' +
         '<div class="wu-list">' + w.warmup.map(function (it, i) {
@@ -454,6 +477,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       var o = $('.ex[data-key="' + cssEsc(state.openKey) + '"]');
       if (o) { o.classList.add('open'); o.parentNode.classList.add('has-open'); }
     }
+    upgradeBgs();
   }
 
   function thumb(it, size) {
@@ -516,10 +540,10 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var filled = ex.log ? (ex.log.sets || []).filter(function (s) { return s.w || s.r; }).length : 0;
     var st = !isAuth() || !filled ? 'none' : (filled >= total ? 'done' : 'partial');
     var idx = tileIdx++;
-    return '<article class="ex ' + TILE_COLORS[idx % 3] + '" style="view-transition-name:tile-' + idx + '" data-key="' + esc(ex.key) + '" data-state="' + st + '">' +
-      '<div class="face ex-head">' +
-        '<div class="open-thumb">' + (ex.yt ? thumb(ex) : '') + '</div>' +
-        '<div class="face-top">' + (ex.yt ? thumb(ex) : '<span class="ph"></span>') +
+    return '<article class="ex ' + TILE_COLORS[idx % 3] + '" style="view-transition-name:tile-' + idx + '" data-key="' + esc(ex.key) + '" data-state="' + st + '"' + (ex.yt ? ' data-yt="' + esc(ex.yt) + '"' : '') + '>' +
+      '<div class="face ex-head"' + (ex.yt ? ' style="--img:url(&quot;' + esc(bgUrl(ex.yt)) + '&quot;)"' : '') + '>' +
+        '<div class="face-top">' +
+          (ex.yt ? '<button class="round play-btn" data-act="play" data-yt="' + esc(ex.yt) + '" data-shorts="' + (ex.shorts ? 1 : 0) + '" aria-label="Смотреть видео">' + ICON_PLAY + '</button>' : '<span></span>') +
           '<span class="round" data-act="toggle" aria-label="Открыть">' + ICON_ARROW + '</span></div>' +
         '<div class="face-main">' + (ex.num ? '<span class="num">' + esc(ex.num) + '</span>' : '') + '<h3>' + esc(ex.name) + '</h3>' +
           '<div class="face-meta"><b>' + esc(ex.sets || '—') + ' × ' + esc(ex.reps || '—') + '</b>' +
@@ -603,19 +627,19 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     if (prog) prog.textContent = filled ? (filled >= total ? '✓ ' : '') + filled + '/' + total : '';
   }
 
-  function openTile(el) {
+  function openTile(el, after) {
     vt(function () {
       $$('.ex.open').forEach(function (o) { if (o !== el) closeTile(o); });
       el.classList.add('open');
       el.parentNode.classList.add('has-open');
       state.openKey = el.getAttribute('data-key');
-    }).then(function () { scrollToTile(el); });
+    }).then(function () { if (after) after(); scrollToTile(el); });
   }
   function closeTile(el) {
     var card = state.cards[el.getAttribute('data-key')];
     if (card && card.dirty) save(card);
     var p = el.querySelector(':scope > .player');
-    if (p) { p.remove(); $$('.thumb.open', el).forEach(function (b) { b.classList.remove('open'); }); }
+    if (p) { p.remove(); $$('.thumb.open, .play-btn.open', el).forEach(function (b) { b.classList.remove('open'); }); }
     el.classList.remove('open');
     el.parentNode.classList.remove('has-open');
     if (state.openKey === el.getAttribute('data-key')) state.openKey = null;
@@ -696,7 +720,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
   }
   function closePlayers() {
     $$('.player').forEach(function (p) { p.remove(); });
-    $$('.thumb.open').forEach(function (b) { b.classList.remove('open'); });
+    $$('.thumb.open, .play-btn.open').forEach(function (b) { b.classList.remove('open'); });
   }
 
   // ---------- таймер отдыха ----------
@@ -750,6 +774,12 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       return;
     }
     var exEl = t.closest('.ex');
+    var pb = t.closest('[data-act="play"]');
+    if (exEl && pb) {
+      if (!exEl.classList.contains('open')) openTile(exEl, function () { toggleVideo(pb); });
+      else toggleVideo(pb);
+      return;
+    }
     if (exEl && !exEl.classList.contains('open')) { openTile(exEl); return; }
     if (exEl && t.closest('[data-act="toggle"]')) {
       vt(function () { closeTile(exEl); }).then(function () {
@@ -805,7 +835,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
   });
 
   document.addEventListener('toggle', function (e) {
-    if (e.target.matches && e.target.matches('details.warm')) store.set('wuopen', e.target.open);
+    if (e.target.matches && e.target.matches('details.warm')) state.wuOpen = e.target.open;
   }, true);
 
   // ---------- обновление из документа ----------
