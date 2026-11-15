@@ -46,7 +46,7 @@
   .wrap { max-width: 640px; margin: 0 auto; padding: 0 14px; }
 
   /* шапка */
-  header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  header { position: relative; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
     backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);
     padding-top: env(safe-area-inset-top); }
   .top { display: flex; align-items: center; gap: 10px; padding: 12px 0 8px; }
@@ -259,12 +259,14 @@
   .ex.bar .face-meta { margin: 0; }
   .ex.bar .face-meta b { font-size: 14px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--tile) 75%, transparent); }
   .ex.bar .prog { display: none; }
-  .group.done .group-head { color: var(--ok); }
-  .group.done .group-head::before { content: "✓"; }
-  .group.done .ex.bar .face-meta b::before { content: "✓ "; }
+  .group.all-done .group-head { color: var(--ok); }
+  .group.all-done .group-head::before { content: "✓"; }
+  .ex.done.bar .face-meta b::before { content: "✓ "; }
+  .ex.done.bar { opacity: .55; }
+  .ex.done.bar:active { opacity: .7; }
   .done-wrap { padding: 0 14px 16px; }
   .done-btn { display: block; width: 100%; height: 50px; border-radius: 14px; font-weight: 800; font-size: 16px; background: var(--accent); color: var(--accent-ink); }
-  .group.done .done-btn { background: var(--card2); color: var(--muted); font-weight: 700; }
+  .ex.done .done-btn { background: var(--card2); color: var(--muted); font-weight: 700; }
   ::view-transition-group(*) { animation-duration: .34s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
   body, button, input, textarea { font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .top h1 { font-weight: 800; letter-spacing: -.02em; }
@@ -478,7 +480,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       var head = g.items.length > 1
         ? '<div class="group-head">Суперсет ' + esc(g.id) + ' · ' + g.items.map(function (x) { return esc(x.num); }).join(' + ') + '</div>'
         : '';
-      return '<section class="group ' + (g.items.length > 1 ? 'superset' : '') + (isDone(g.id) ? ' done' : '') + '" data-gid="' + esc(g.id) + '" data-n="' + g.items.length + '">' + head +
+      return '<section class="group ' + (g.items.length > 1 ? 'superset' : '') + '" data-gid="' + esc(g.id) + '" data-n="' + g.items.length + '">' + head +
         '<div class="pair ' + (g.items.length === 1 ? 'single' : '') + '">' + g.items.map(exCard).join('') + '</div></section>';
     }).join('');
 
@@ -565,7 +567,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var filled = ex.log ? (ex.log.sets || []).filter(function (s) { return s.w || s.r; }).length : 0;
     var st = !isAuth() || !filled ? 'none' : (filled >= total ? 'done' : 'partial');
     var idx = tileIdx++;
-    return '<article class="ex ' + TILE_COLORS[idx % 3] + '" style="view-transition-name:tile-' + idx + '" data-key="' + esc(ex.key) + '" data-state="' + st + '"' + (ex.yt ? ' data-yt="' + esc(ex.yt) + '"' : '') + '>' +
+    return '<article class="ex ' + TILE_COLORS[idx % 3] + (isDone(ex.key) ? ' done' : '') + '" style="view-transition-name:tile-' + idx + '" data-key="' + esc(ex.key) + '" data-state="' + st + '"' + (ex.yt ? ' data-yt="' + esc(ex.yt) + '"' : '') + '>' +
       '<div class="face ex-head"' + (ex.yt ? ' style="--img:url(&quot;' + esc(bgUrl(ex.yt)) + '&quot;)"' : '') + '>' +
         '<div class="face-top">' +
           (ex.yt ? '<button class="round play-btn" data-act="play" data-yt="' + esc(ex.yt) + '" data-shorts="' + (ex.shorts ? 1 : 0) + '" aria-label="Смотреть видео">' + ICON_PLAY + '</button>' : '<span></span>') +
@@ -673,26 +675,27 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     layoutGroup(el.closest('section.group'));
   }
 
-  // выполненные суперсеты (хранятся на этом телефоне)
-  function doneKey(gid) { return 'done|' + (state.data && state.data.title) + '|' + state.curLabel + '|' + gid; }
-  function isDone(gid) { return !!store.get(doneKey(gid), false); }
-  // раскрыто одно упражнение → остальные из суперсета полосками; суперсет выполнен → все полосками
+  // выполненные упражнения (хранятся на этом телефоне; ключ упражнения уже содержит неделю и тренировку)
+  function doneKey(k) { return 'done|' + k; }
+  function isDone(k) { return !!store.get(doneKey(k), false); }
+  // раскрыто одно упражнение или хоть одно выполнено → весь суперсет полосками
   function layoutGroup(sec) {
     if (!sec) return;
     var exs = $$('.ex', sec);
+    var isD = function (e) { return e.classList.contains('done'); };
     var open = exs.some(function (e) { return e.classList.contains('open'); });
-    var done = sec.classList.contains('done');
+    var anyDone = exs.some(isD);
+    sec.classList.toggle('all-done', exs.length > 0 && exs.every(isD));
     var pair = $('.pair', sec);
     if (pair) pair.classList.toggle('has-open', open);
-    exs.forEach(function (e) { e.classList.toggle('bar', !e.classList.contains('open') && (open || done)); });
-    var n = +sec.getAttribute('data-n');
+    exs.forEach(function (e) { e.classList.toggle('bar', !e.classList.contains('open') && (open || anyDone)); });
     $$('.done-btn', sec).forEach(function (b) {
-      b.textContent = done ? 'Снять отметку «выполнено»' : (n > 1 ? '✓ Суперсет выполнен' : '✓ Упражнение выполнено');
+      b.textContent = isD(b.closest('.ex')) ? 'Снять отметку «выполнено»' : '✓ Выполнено';
     });
   }
   function layoutAll() { $$('section.group').forEach(layoutGroup); }
   function scrollToTile(el) {
-    var r = el.getBoundingClientRect(), hh = $('header').offsetHeight;
+    var r = el.getBoundingClientRect(), hh = 0;
     if (r.top < hh + 4 || r.top > window.innerHeight * 0.45) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
   }
 
@@ -830,7 +833,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     if (exEl && !exEl.classList.contains('open')) { openTile(exEl); return; }
     if (exEl && t.closest('[data-act="toggle"]')) {
       vt(function () { closeTile(exEl); }).then(function () {
-        var r = exEl.getBoundingClientRect(), hh = $('header').offsetHeight;
+        var r = exEl.getBoundingClientRect(), hh = 0;
         if (r.top < hh) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
       });
       return;
@@ -838,19 +841,18 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
 
     var db = t.closest('[data-act="done"]');
     if (db) {
-      var sec = db.closest('section.group');
-      var now = !sec.classList.contains('done');
-      store.set(doneKey(sec.getAttribute('data-gid')), now);
+      var exD = db.closest('.ex'), sec = exD.closest('section.group');
+      var now = !exD.classList.contains('done');
+      store.set(doneKey(exD.getAttribute('data-key')), now);
       vt(function () {
-        if (now) $$('.ex.open', sec).forEach(closeTile);
-        sec.classList.toggle('done', now);
-        layoutGroup(sec);
+        exD.classList.toggle('done', now);
+        if (now) closeTile(exD); else layoutGroup(sec);
       }).then(function () {
         if (!now) return;
         var next = sec.nextElementSibling;
-        var target = next && next.matches && next.matches('section.group') ? next : sec;
-        var r = target.getBoundingClientRect(), hh = $('header').offsetHeight;
-        window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
+        var target = sec.classList.contains('all-done') && next && next.matches && next.matches('section.group') ? next : sec;
+        var r = target.getBoundingClientRect();
+        if (target !== sec || r.top < 0) window.scrollTo({ top: r.top + window.scrollY - 10, behavior: 'smooth' });
       });
       return;
     }
