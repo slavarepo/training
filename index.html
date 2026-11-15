@@ -196,7 +196,6 @@
   .ex:not(.open) { cursor: pointer; }
   .ex:not(.open):active { filter: brightness(.93); }
   .ex.open { grid-column: 1 / -1; background: var(--card); color: var(--text); }
-  .pair.has-open .ex:not(.open) { display: none; }
 
   .face { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 14px; height: 186px; background: var(--tile); color: var(--tile-ink); }
   .face-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -248,6 +247,24 @@
   .round .ico-close { display: none; }
   .ex.open .round .ico-open { display: none; }
   .ex.open .round .ico-close { display: block; }
+  /* полоска: соседнее упражнение при раскрытом и выполненный суперсет */
+  .ex.bar { grid-column: 1 / -1; }
+  .ex.bar .face { flex-direction: row; align-items: center; height: 64px; padding: 10px 14px; gap: 10px; }
+  .ex.bar .face::before { left: 50%; filter: saturate(.75) contrast(1.05); background-position: center 35%; }
+  .ex.bar .face::after { background: linear-gradient(90deg, var(--tile) 50%, color-mix(in srgb, var(--tile) 55%, transparent) 70%, color-mix(in srgb, var(--tile) 15%, transparent) 100%); }
+  .ex.bar .face-top, .ex.bar .face-sub { display: none; }
+  .ex.bar .face-main { margin-top: 0; flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .ex.bar .num { margin: 0; }
+  .ex.bar .face h3 { margin: 0; font-size: 15px; -webkit-line-clamp: 1; flex: 1; min-width: 0; }
+  .ex.bar .face-meta { margin: 0; }
+  .ex.bar .face-meta b { font-size: 14px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--tile) 75%, transparent); }
+  .ex.bar .prog { display: none; }
+  .group.done .group-head { color: var(--ok); }
+  .group.done .group-head::before { content: "✓"; }
+  .group.done .ex.bar .face-meta b::before { content: "✓ "; }
+  .done-wrap { padding: 0 14px 16px; }
+  .done-btn { display: block; width: 100%; height: 50px; border-radius: 14px; font-weight: 800; font-size: 16px; background: var(--accent); color: var(--accent-ink); }
+  .group.done .done-btn { background: var(--card2); color: var(--muted); font-weight: 700; }
   ::view-transition-group(*) { animation-duration: .34s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
   body, button, input, textarea { font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .top h1 { font-weight: 800; letter-spacing: -.02em; }
@@ -449,6 +466,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
 
     // группируем 1а/1б в суперсеты
     tileIdx = 0;
+    state.curLabel = w.label;
     var groups = [];
     (w.exercises || []).forEach(function (ex) {
       var g = (String(ex.num).match(/^\d+/) || [ex.num || ex.name])[0];
@@ -460,7 +478,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       var head = g.items.length > 1
         ? '<div class="group-head">Суперсет ' + esc(g.id) + ' · ' + g.items.map(function (x) { return esc(x.num); }).join(' + ') + '</div>'
         : '';
-      return '<section class="group ' + (g.items.length > 1 ? 'superset' : '') + '">' + head +
+      return '<section class="group ' + (g.items.length > 1 ? 'superset' : '') + (isDone(g.id) ? ' done' : '') + '" data-gid="' + esc(g.id) + '" data-n="' + g.items.length + '">' + head +
         '<div class="pair ' + (g.items.length === 1 ? 'single' : '') + '">' + g.items.map(exCard).join('') + '</div></section>';
     }).join('');
 
@@ -483,6 +501,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       var o = $('.ex[data-key="' + cssEsc(state.openKey) + '"]');
       if (o) { o.classList.add('open'); o.parentNode.classList.add('has-open'); }
     }
+    layoutAll();
     upgradeBgs();
   }
 
@@ -567,6 +586,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
         (!ex.log && !ex.prev && ex.mine ? '<div class="indoc">В документе: ' + esc(ex.mine) + '</div>' : '') +
         '<div class="status"></div>' +
       '</div>' : '<div style="height:14px"></div>') +
+      '<div class="done-wrap"><button class="done-btn" data-act="done"></button></div>' +
       '</div>' +
     '</article>';
   }
@@ -639,6 +659,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       el.classList.add('open');
       el.parentNode.classList.add('has-open');
       state.openKey = el.getAttribute('data-key');
+      layoutAll();
     }).then(function () { if (after) after(); scrollToTile(el); });
   }
   function closeTile(el) {
@@ -649,7 +670,27 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     el.classList.remove('open');
     el.parentNode.classList.remove('has-open');
     if (state.openKey === el.getAttribute('data-key')) state.openKey = null;
+    layoutGroup(el.closest('section.group'));
   }
+
+  // выполненные суперсеты (хранятся на этом телефоне)
+  function doneKey(gid) { return 'done|' + (state.data && state.data.title) + '|' + state.curLabel + '|' + gid; }
+  function isDone(gid) { return !!store.get(doneKey(gid), false); }
+  // раскрыто одно упражнение → остальные из суперсета полосками; суперсет выполнен → все полосками
+  function layoutGroup(sec) {
+    if (!sec) return;
+    var exs = $$('.ex', sec);
+    var open = exs.some(function (e) { return e.classList.contains('open'); });
+    var done = sec.classList.contains('done');
+    var pair = $('.pair', sec);
+    if (pair) pair.classList.toggle('has-open', open);
+    exs.forEach(function (e) { e.classList.toggle('bar', !e.classList.contains('open') && (open || done)); });
+    var n = +sec.getAttribute('data-n');
+    $$('.done-btn', sec).forEach(function (b) {
+      b.textContent = done ? 'Снять отметку «выполнено»' : (n > 1 ? '✓ Суперсет выполнен' : '✓ Упражнение выполнено');
+    });
+  }
+  function layoutAll() { $$('section.group').forEach(layoutGroup); }
   function scrollToTile(el) {
     var r = el.getBoundingClientRect(), hh = $('header').offsetHeight;
     if (r.top < hh + 4 || r.top > window.innerHeight * 0.45) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
@@ -791,6 +832,25 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       vt(function () { closeTile(exEl); }).then(function () {
         var r = exEl.getBoundingClientRect(), hh = $('header').offsetHeight;
         if (r.top < hh) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
+      });
+      return;
+    }
+
+    var db = t.closest('[data-act="done"]');
+    if (db) {
+      var sec = db.closest('section.group');
+      var now = !sec.classList.contains('done');
+      store.set(doneKey(sec.getAttribute('data-gid')), now);
+      vt(function () {
+        if (now) $$('.ex.open', sec).forEach(closeTile);
+        sec.classList.toggle('done', now);
+        layoutGroup(sec);
+      }).then(function () {
+        if (!now) return;
+        var next = sec.nextElementSibling;
+        var target = next && next.matches && next.matches('section.group') ? next : sec;
+        var r = target.getBoundingClientRect(), hh = $('header').offsetHeight;
+        window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
       });
       return;
     }
