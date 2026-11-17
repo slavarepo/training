@@ -52,7 +52,9 @@
   .top { display: flex; align-items: center; gap: 10px; padding: 12px 0 8px; }
   .top h1 { font-size: 22px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
   .top .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-  .top .grow { flex: 1; min-width: 0; }
+  .top .grow { flex: 1; min-width: 0; position: relative; }
+  .wk-chev { display: inline-block; font-size: 15px; margin-left: 6px; opacity: .6; transform: translateY(-2px); }
+  #week-sel { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; cursor: pointer; }
   .iconbtn { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--card); border: 1px solid var(--line); }
   .iconbtn svg { width: 20px; height: 20px; }
   .iconbtn.spin svg { animation: spin .8s linear infinite; }
@@ -279,6 +281,7 @@
     <div class="top">
       <div class="grow">
         <h1 id="h-title">Тренировки</h1>
+        <select id="week-sel" aria-label="Выбрать неделю" hidden></select>
         <div class="sub" id="h-sub"></div>
       </div>
       <button class="install" id="install" hidden>Установить</button>
@@ -369,7 +372,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
   // ---------- связь с Google ----------
   function code() { return store.get('code', ''); }
   function apiGet(k) {
-    return fetch(API_URL + '?a=data' + (k ? '&k=' + encodeURIComponent(k) : ''), { redirect: 'follow' })
+    return fetch(API_URL + '?a=data' + (k ? '&k=' + encodeURIComponent(k) : '') + (state.docId ? '&doc=' + encodeURIComponent(state.docId) : ''), { redirect: 'follow' })
       .then(function (r) { if (!r.ok) throw new Error('Google ответил ' + r.status); return r.json(); });
   }
   function apiPost(body) {
@@ -423,8 +426,15 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       return;
     }
     var tt = parseTitle(d.title);
-    $('#h-title').textContent = tt.main;
+    var weeks = d.weeks || [];
+    $('#h-title').innerHTML = esc(tt.main) + (weeks.length > 1 ? '<span class="wk-chev">▾</span>' : '');
     $('#h-sub').textContent = tt.sub;
+    var sel = $('#week-sel');
+    sel.hidden = weeks.length < 2;
+    sel.innerHTML = weeks.slice().reverse().map(function (wk) {
+      return '<option value="' + esc(wk.id) + '"' + (wk.id === d.docId ? ' selected' : '') + '>' +
+        esc(wk.name) + (wk.id === d.latestId ? ' · текущая' : '') + '</option>';
+    }).join('');
     document.title = tt.main + ' — тренировки';
 
     var ws = d.workouts || [];
@@ -491,6 +501,9 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     html += '<p class="foot">' + (state.offline ? 'Нет связи — показана сохранённая версия от ' : 'Обновлено из документа в ') + whenTxt +
       ' · <a href="' + esc(d.docUrl) + '" target="_blank">документ</a>' + (isAuth() && d.logUrl ? ' · <a href="' + esc(d.logUrl) + '" target="_blank">журнал</a>' : '') + '</p>';
 
+    if (d.latestId && d.docId && d.docId !== d.latestId) {
+      html = '<div class="note-bar"><span class="grow">Это прошлая неделя.</span><button class="linkbtn" data-act="latest">К текущей →</button></div>' + html;
+    }
     if (!isAuth()) {
       html = '<div class="note-bar"><span class="grow">Режим просмотра. Чтобы записывать подходы — войди по коду.</span><button class="linkbtn" data-act="login">Войти</button></div>' + html;
     }
@@ -720,7 +733,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var ex = card.ex, d = state.data;
     card.saving = true; card.dirty = false;
     status(card, 'Сохраняю…', 'busy');
-    call('saveLog', { key: ex.key, week: d.title, label: card.w.label, num: ex.num, name: ex.name, sets: v.sets, comment: v.comment })
+    call('saveLog', { key: ex.key, week: d.title, label: card.w.label, num: ex.num, name: ex.name, sets: v.sets, comment: v.comment, docId: d.docId })
       .then(function (res) {
         card.saving = false;
         ex.log = v;
@@ -881,6 +894,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
 
     var act = t.closest('[data-act]');
     if (act && act.getAttribute('data-act') === 'login') { openModal(); return; }
+    if (act && act.getAttribute('data-act') === 'latest') { switchWeek(''); return; }
     if (act) {
       var el = act.closest('.ex');
       if (!el) return;
@@ -918,7 +932,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     return call('getData').then(function (d) {
       btn.classList.remove('spin');
       if (d.authError === 'bad code') { store.del('code'); }
-      store.set('cache|data', d);
+      if (!state.docId) store.set('cache|data', d);
       updateLock(!!d.auth);
       if (silent && busy()) return d;
       var y = window.scrollY;
@@ -940,6 +954,18 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     });
   }
   $('#refresh').addEventListener('click', function () { refresh(false); });
+
+  // ---------- переключение недель (каждая неделя — отдельный документ в папке тренера) ----------
+  function switchWeek(id) {
+    var d = state.data;
+    state.docId = d && id === d.latestId ? '' : id;
+    state.active = null; state.openKey = null;
+    closePlayers();
+    $('#main').innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><br><br>Загружаю неделю…</div>';
+    window.scrollTo({ top: 0 });
+    refresh(false);
+  }
+  $('#week-sel').addEventListener('change', function (e) { switchWeek(e.target.value); });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && Date.now() - state.loadedAt > 5 * 60 * 1000 && !busy()) refresh(true);
   });
