@@ -536,6 +536,23 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var m = s.match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:кг|[*+x×]|$)/i);
     return m ? m[1] : 'кг';
   }
+  // Веса по подходам, если тренер расписал их: «30/35/35», «30 35 35» или слитно «303535»
+  function setWeights(ex) {
+    var n = nSets(ex), s = String(ex.intensity || '').trim().replace(/\s*кг\s*$/i, '');
+    if (!s || n < 2) return null;
+    var parts = s.split(/\s*[\/;,]\s*|\s+/).filter(Boolean);
+    if (parts.length === n && parts.every(function (p) { return /^\d+([.,]\d+)?$/.test(p); })) return parts;
+    if (/^\d+$/.test(s) && s.length > 3 && s.length % n === 0) {
+      var len = s.length / n, out = [];
+      for (var i = 0; i < n; i++) out.push(s.slice(i * len, (i + 1) * len));
+      return out;
+    }
+    return null;
+  }
+  function intensityText(ex) {
+    var w = setWeights(ex);
+    return w ? w.join(' / ') + ' кг' : (ex.intensity || '');
+  }
   function repsHint(ex) {
     var m = String(ex.reps || '').match(/\d+(?:\s*[-–]\s*\d+)?/);
     return m ? m[0].replace(/\s+/g, '') : '';
@@ -561,7 +578,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
   function exCard(ex) {
     var specs = '';
     specs += '<div class="spec main"><span>Подходы × повторы</span><b>' + esc(ex.sets || '—') + ' × ' + esc(ex.reps || '—') + '</b></div>';
-    if (ex.intensity) specs += '<div class="spec main"><span>Интенсивность</span><b>' + esc(ex.intensity) + '</b></div>';
+    if (ex.intensity) specs += '<div class="spec main"><span>Интенсивность</span><b>' + esc(intensityText(ex)) + '</b></div>';
     if (ex.warmup) specs += '<div class="spec"><span>Разминочный</span><b>' + esc(ex.warmup) + '</b></div>';
     var rs = restSeconds(ex.rest);
     if (ex.rest) specs += rs
@@ -588,7 +605,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
         '<div class="face-main">' + (ex.num ? '<span class="num">' + esc(ex.num) + '</span>' : '') + '<h3>' + esc(ex.name) + '</h3>' +
           '<div class="face-meta"><b>' + esc(ex.sets || '—') + ' × ' + esc(ex.reps || '—') + '</b>' +
             (isAuth() ? '<span class="prog">' + (filled ? (filled >= total ? '✓ ' : '') + filled + '/' + total : '') + '</span>' : '') + '</div>' +
-          '<div class="face-sub">' + esc(ex.intensity || ex.rest || '') + '</div>' +
+          '<div class="face-sub">' + esc(intensityText(ex) || ex.rest || '') + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="body">' +
@@ -644,7 +661,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var row = document.createElement('div');
     row.className = 'set';
     row.innerHTML = '<span class="i">' + (i + 1) + '</span>' +
-      '<input data-f="w" inputmode="decimal" autocomplete="off" aria-label="Вес, подход ' + (i + 1) + '" placeholder="' + esc(pv.w || weightHint(ex)) + '">' +
+      '<input data-f="w" inputmode="decimal" autocomplete="off" aria-label="Вес, подход ' + (i + 1) + '" placeholder="' + esc((setWeights(ex) || [])[i] || pv.w || weightHint(ex)) + '">' +
       '<span class="u">×</span>' +
       '<input data-f="r" inputmode="numeric" autocomplete="off" aria-label="Повторы, подход ' + (i + 1) + '" placeholder="' + esc(pv.r || repsHint(ex)) + '">' +
       '<span class="u">' + unitFor(ex) + '</span>';
