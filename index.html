@@ -130,6 +130,13 @@
   .prev { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--muted); margin-bottom: 10px; }
   .prev .txt { flex: 1; min-width: 0; }
   .prev b { color: var(--text); font-weight: 600; }
+  .rec { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 7px; border-radius: 7px; vertical-align: top;
+    font-size: 12px; font-weight: 800; line-height: 1.5; background: #ff4757; color: #fff; }
+  .rec svg { width: 13px; height: 13px; }
+  .ex.bar .rec { margin-left: 0; }
+  .rec-note { display: flex; align-items: center; gap: 10px; margin: 12px 14px 0; padding: 10px 12px; border-radius: 12px;
+    background: color-mix(in srgb, #ff4757 16%, transparent); border: 1px solid color-mix(in srgb, #ff4757 45%, transparent); font-size: 14px; font-weight: 600; }
+  .rec-note svg { width: 20px; height: 20px; flex: 0 0 auto; color: #ff6b78; }
   .progress { margin: 0 0 14px; padding: 12px 12px 6px; border-radius: 14px; background: var(--card2); }
   .pg-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .pg-head span { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 700; margin-right: auto; }
@@ -335,6 +342,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
   var ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z"/></svg>';
   var ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   var ICON_CHEV = '<svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  var ICON_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="13" height="11" rx="2.5"/><path d="M15.5 10.5l6-3.5v10l-6-3.5z"/></svg>';
   var ICON_TIMER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>';
 
   var ICON_ARROW = '<svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>' +
@@ -611,13 +619,15 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
         '<div class="face-top">' +
           (ex.yt ? '<button class="round play-btn" data-act="play" data-yt="' + esc(ex.yt) + '" data-shorts="' + (ex.shorts ? 1 : 0) + '" aria-label="Смотреть видео">' + ICON_PLAY + '</button>' : '<span></span>') +
           '<span class="round" data-act="toggle" aria-label="Открыть">' + ICON_ARROW + '</span></div>' +
-        '<div class="face-main">' + (ex.num ? '<span class="num">' + esc(ex.num) + '</span>' : '') + '<h3>' + esc(ex.name) + '</h3>' +
+        '<div class="face-main">' + (ex.num ? '<span class="num">' + esc(ex.num) + '</span>' : '') +
+          (ex.video ? '<span class="rec" title="Тренер просит снять на видео">' + ICON_CAM + 'видео</span>' : '') + '<h3>' + esc(ex.name) + '</h3>' +
           '<div class="face-meta"><b>' + esc(ex.sets || '—') + ' × ' + esc(ex.reps || '—') + '</b>' +
             (isAuth() ? '<span class="prog">' + (filled ? (filled >= total ? '✓ ' : '') + filled + '/' + total : '') + '</span>' : '') + '</div>' +
           '<div class="face-sub">' + esc(intensityText(ex) || ex.rest || '') + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="body">' +
+      (ex.video ? '<div class="rec-note">' + ICON_CAM + '<span>Тренер просит снять это упражнение на видео</span></div>' : '') +
       '<div class="specs">' + specs + '</div>' +
       (ex.note ? '<div class="tnote"><small>Тренер</small>' + esc(ex.note) + '</div>' : '') +
       (isAuth() ? '<div class="log">' + '<div class="progress"></div>' + prev +
