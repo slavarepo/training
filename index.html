@@ -866,7 +866,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var vertical = btn.getAttribute('data-shorts') === '1';
     var p = document.createElement('div');
     p.className = 'player';
-    var src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) +
+    var src = 'https://www.youtube.com/embed/' + encodeURIComponent(id) +
       '?autoplay=1&mute=1&playsinline=1&loop=1&playlist=' + encodeURIComponent(id) + '&rel=0&modestbranding=1';
     var link = vertical ? 'https://www.youtube.com/shorts/' + id : 'https://youtu.be/' + id;
     var frameStyle = vertical
