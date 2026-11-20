@@ -36,7 +36,7 @@
       var(--bg);
     background-attachment: fixed; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  html, body { margin: 0; background: var(--bg); color: var(--text); overscroll-behavior-y: none; }
   body {
     font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     padding: 0 env(safe-area-inset-right) calc(96px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
@@ -285,6 +285,21 @@
   .done-wrap { padding: 0 14px 16px; }
   .done-btn { display: block; width: 100%; height: 50px; border-radius: 14px; font-weight: 800; font-size: 16px; background: var(--accent); color: var(--accent-ink); }
   .ex.done .done-btn { background: var(--card2); color: var(--muted); font-weight: 700; }
+  /* плавающая кнопка отдыха / таймер */
+  .timer { visibility: visible; transform: translate(-50%, 0); transition: background .2s, color .2s; width: min(calc(100% - 28px), 440px);
+    padding: 6px; gap: 6px; min-height: 60px; justify-content: center; }
+  .timer .t-main { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; height: 48px; padding: 0 10px; border-radius: 999px; background: none; font-weight: 800; }
+  .timer .t-main svg { width: 22px; height: 22px; flex: 0 0 auto; }
+  .timer .t-main .lbl { font-size: 15px; opacity: .8; margin: 0; }
+  .timer .t-main .tt { font-size: 24px; min-width: 0; }
+  .timer #t-plus, .timer #t-stop { display: none; height: 48px; min-width: 48px; }
+  .timer.on #t-plus, .timer.on #t-stop { display: inline-block; }
+  .timer.prep { background: var(--warn); color: #241600; }
+  .timer.work { background: var(--blue); color: #fff; }
+  .hold-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: calc(100% - 28px); margin: 10px 14px 0; height: 52px;
+    border-radius: 14px; background: var(--blue); color: #fff; font-weight: 800; font-size: 16px; }
+  .hold-btn svg { width: 20px; height: 20px; }
+  .hold-btn small { font-weight: 600; opacity: .8; font-size: 12px; }
   ::view-transition-group(*) { animation-duration: .34s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
   body, button, input, textarea { font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .top h1 { font-weight: 800; letter-spacing: -.02em; }
@@ -314,7 +329,7 @@
 <main class="wrap" id="main"></main>
 
 <div class="timer" id="timer" role="timer" aria-live="polite">
-  <span class="lbl">Отдых</span><span class="tt" id="tt">0:00</span>
+  <button class="t-main" id="t-main" aria-label="Запустить отдых"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg><span class="lbl" id="t-lbl">Отдых</span><span class="tt" id="tt">1:00</span></button>
   <button id="t-plus" aria-label="Плюс 15 секунд">+15</button>
   <button id="t-stop" aria-label="Остановить таймер">✕</button>
 </div>
@@ -566,9 +581,39 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     }
     return null;
   }
+  // «12.5+12.5» → «12.5+12.5 кг», «10*2» → «10×2 кг», «12.5кг» → «12.5 кг»; остальное как у тренера
+  function weightText(v) {
+    v = String(v || '').replace(/\s+/g, ' ').trim();
+    if (!v) return '';
+    if (/кг$/i.test(v)) return v.replace(/\s*кг$/i, ' кг');
+    if (/^[\d.,]+(\s*[+*x×]\s*[\d.,]+)*$/i.test(v)) return v.replace(/\s*[*x×]\s*/gi, '×').replace(/\s*\+\s*/g, '+') + ' кг';
+    return v;
+  }
   function intensityText(ex) {
     var w = setWeights(ex);
-    return w ? w.join(' / ') + ' кг' : (ex.intensity || '');
+    return w ? w.join(' / ') + ' кг' : weightText(ex.intensity);
+  }
+  function intensityLabel(ex) {
+    var s = String(ex.intensity || '');
+    if (setWeights(ex) || /кг|свой\s*вес/i.test(s) || /^[\d.,]+([+*x×][\d.,]+)*$/i.test(s.replace(/\s/g, ''))) return 'Вес';
+    if (/запас/i.test(s)) return 'Запас повторов';
+    return 'Нагрузка';
+  }
+  // «8-12» → «8-12 раз», «10К» → «10 раз», «35сек» → «35 сек»
+  function repsText(r) {
+    r = String(r || '').trim();
+    if (!r) return '—';
+    var t = r.match(/(\d+(?:[.,]\d+)?(?:\s*[-–]\s*\d+)?)\s*(сек|с\b|мин)/i);
+    if (t) return t[1].replace(/\s+/g, '') + ' ' + (/мин/i.test(t[2]) ? 'мин' : 'сек');
+    var n = r.match(/^(\d+(?:\s*[-–]\s*\d+)?)/);
+    return n ? n[1].replace(/\s+/g, '') + ' раз' : r;
+  }
+  // упражнение на время (планка): длительность подхода в секундах, первое значение
+  function holdSeconds(ex) {
+    var t = String(ex.reps || '').match(/(\d+(?:[.,]\d+)?)(?:\s*[-–]\s*\d+)?\s*(сек|с\b|мин)/i);
+    if (!t) return 0;
+    var v = parseFloat(t[1].replace(',', '.'));
+    return Math.round(/мин/i.test(t[2]) ? v * 60 : v);
   }
   function repsHint(ex) {
     var m = String(ex.reps || '').match(/\d+(?:\s*[-–]\s*\d+)?/);
@@ -594,13 +639,11 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
 
   function exCard(ex) {
     var specs = '';
-    specs += '<div class="spec main"><span>Подходы × повторы</span><b>' + esc(ex.sets || '—') + ' × ' + esc(ex.reps || '—') + '</b></div>';
-    if (ex.intensity) specs += '<div class="spec main"><span>Интенсивность</span><b>' + esc(intensityText(ex)) + '</b></div>';
-    if (ex.warmup) specs += '<div class="spec"><span>Разминочный</span><b>' + esc(ex.warmup) + '</b></div>';
-    var rs = restSeconds(ex.rest);
-    if (ex.rest) specs += rs
-      ? '<button class="spec rest" data-sec="' + rs + '">' + ICON_TIMER + '<div><span>Отдых · таймер</span><b>' + esc(ex.rest) + '</b></div></button>'
-      : '<div class="spec"><span>Отдых</span><b>' + esc(ex.rest) + '</b></div>';
+    specs += '<div class="spec main"><span>Подходы × повторы</span><b>' + esc(ex.sets || '—') + ' × ' + esc(repsText(ex.reps)) + '</b></div>';
+    if (ex.intensity) specs += '<div class="spec main"><span>' + intensityLabel(ex) + '</span><b>' + esc(intensityText(ex)) + '</b></div>';
+    if (ex.warmup) specs += '<div class="spec"><span>Разминочный</span><b>' + esc(weightText(ex.warmup)) + '</b></div>';
+    if (ex.rest) specs += '<div class="spec"><span>Отдых</span><b>' + esc(ex.rest) + '</b></div>';
+    var hs = holdSeconds(ex);
 
     var prev = '';
     if (ex.prev) {
@@ -621,7 +664,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
           '<span class="round" data-act="toggle" aria-label="Открыть">' + ICON_ARROW + '</span></div>' +
         '<div class="face-main">' + (ex.num ? '<span class="num">' + esc(ex.num) + '</span>' : '') +
           (ex.video ? '<span class="rec" title="Тренер просит снять на видео">' + ICON_CAM + 'видео</span>' : '') + '<h3>' + esc(ex.name) + '</h3>' +
-          '<div class="face-meta"><b>' + esc(ex.sets || '—') + ' × ' + esc(ex.reps || '—') + '</b>' +
+          '<div class="face-meta"><b>' + esc(ex.sets || '—') + ' × ' + esc(repsText(ex.reps)) + '</b>' +
             (isAuth() ? '<span class="prog">' + (filled ? (filled >= total ? '✓ ' : '') + filled + '/' + total : '') + '</span>' : '') + '</div>' +
           '<div class="face-sub">' + esc(intensityText(ex) || ex.rest || '') + '</div>' +
         '</div>' +
@@ -629,6 +672,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       '<div class="body">' +
       (ex.video ? '<div class="rec-note">' + ICON_CAM + '<span>Тренер просит снять это упражнение на видео</span></div>' : '') +
       '<div class="specs">' + specs + '</div>' +
+      (hs ? '<button class="hold-btn" data-act="hold" data-sec="' + hs + '">' + ICON_TIMER + '<span>Таймер подхода · ' + hs + ' сек</span><small>старт через 5 с</small></button>' : '') +
       (ex.note ? '<div class="tnote"><small>Тренер</small>' + esc(ex.note) + '</div>' : '') +
       (isAuth() ? '<div class="log">' + '<div class="progress"></div>' + prev +
         '<div class="sets"></div>' +
@@ -771,6 +815,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       el.classList.add('open');
       el.parentNode.classList.add('has-open');
       state.openKey = el.getAttribute('data-key');
+      if (!(history.state && history.state.tile)) { try { history.pushState({ tile: 1 }, ''); } catch (e) {} }
       layoutAll();
     }).then(function () { if (after) after(); scrollToTile(el); });
   }
@@ -802,8 +847,20 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     $$('.done-btn', sec).forEach(function (b) {
       b.textContent = isD(b.closest('.ex')) ? 'Снять отметку «выполнено»' : '✓ Выполнено';
     });
+    idleTimer();
   }
-  function layoutAll() { $$('section.group').forEach(layoutGroup); }
+  function layoutAll() { $$('section.group').forEach(layoutGroup); idleTimer(); }
+  // системная «Назад»: сначала сворачивает открытую карточку
+  function backIfTile() { if (history.state && history.state.tile) { try { history.back(); } catch (e) {} } }
+  window.addEventListener('popstate', function () {
+    var o = $('.ex.open');
+    if (o) vt(function () { closeTile(o); });
+  });
+  function exByKey(k) {
+    var ws = (state.data && state.data.workouts) || [];
+    for (var i = 0; i < ws.length; i++) for (var j = 0; j < ws[i].exercises.length; j++) if (ws[i].exercises[j].key === k) return ws[i].exercises[j];
+    return null;
+  }
   function scrollToTile(el) {
     var r = el.getBoundingClientRect(), hh = 0;
     if (r.top < hh + 4 || r.top > window.innerHeight * 0.45) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
@@ -884,41 +941,69 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
   }
 
   // ---------- таймер отдыха ----------
-  var timer = { end: 0, h: null, ctx: null };
-  function startTimer(sec) {
+  var timer = { end: 0, h: null, ctx: null, mode: '', after: null, workSec: 0, lastBeep: 0, endT: null };
+  function fmtT(s) { return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
+  // время отдыха: из открытого упражнения, иначе 1 минута
+  function defaultRest() {
+    var o = $('.ex.open'), ex = o && exByKey(o.getAttribute('data-key'));
+    return (ex && restSeconds(ex.rest)) || 60;
+  }
+  function idleTimer() {
+    if (timer.mode) return;
+    $('#t-lbl').textContent = 'Отдых';
+    $('#tt').textContent = fmtT(defaultRest());
+  }
+  function startTimer(sec, mode, after) {
     try { timer.ctx = timer.ctx || new (window.AudioContext || window.webkitAudioContext)(); timer.ctx.resume && timer.ctx.resume(); } catch (e) {}
+    clearTimeout(timer.endT);
+    timer.mode = mode || 'rest'; timer.after = after || null; timer.lastBeep = 0;
     timer.end = Date.now() + sec * 1000;
-    $('#timer').classList.add('on'); $('#timer').classList.remove('end');
+    var el = $('#timer');
+    el.classList.add('on'); el.classList.remove('end', 'prep', 'work');
+    if (timer.mode !== 'rest') el.classList.add(timer.mode);
+    $('#t-lbl').textContent = timer.mode === 'prep' ? 'Приготовься' : timer.mode === 'work' ? 'Подход' : 'Отдых';
     clearInterval(timer.h);
     tick();
-    timer.h = setInterval(tick, 250);
+    timer.h = setInterval(tick, 200);
   }
+  function startHold(sec, after) { timer.workSec = sec; startTimer(5, 'prep', after); }
   function tick() {
-    var left = Math.max(0, Math.round((timer.end - Date.now()) / 1000));
-    $('#tt').textContent = Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2);
+    var left = Math.max(0, Math.ceil((timer.end - Date.now()) / 1000));
+    $('#tt').textContent = fmtT(left);
+    if (timer.mode === 'prep' && left > 0 && left <= 3 && timer.lastBeep !== left) { timer.lastBeep = left; beep(1, 660); }
     if (left <= 0) {
       clearInterval(timer.h);
+      var after = timer.after, mode = timer.mode;
+      if (mode === 'prep') { beep(1, 990); vibrate(250); startTimer(timer.workSec, 'work', after); return; }
+      timer.after = null;
       $('#timer').classList.add('end');
-      beep();
-      try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
-      setTimeout(stopTimer, 4000);
+      beep(2, 880); vibrate([300, 150, 300]);
+      if (after) after();
+      timer.endT = setTimeout(stopTimer, 3000);
     }
   }
-  function stopTimer() { clearInterval(timer.h); $('#timer').classList.remove('on', 'end'); }
-  function beep() {
+  function stopTimer() {
+    clearInterval(timer.h); clearTimeout(timer.endT);
+    timer.mode = ''; timer.after = null;
+    $('#timer').classList.remove('on', 'end', 'prep', 'work');
+    idleTimer();
+  }
+  function vibrate(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
+  function beep(n, freq) {
     var c = timer.ctx; if (!c) return;
     try {
-      [0, 0.35].forEach(function (t) {
-        var o = c.createOscillator(), g = c.createGain();
-        o.frequency.value = 880; o.connect(g); g.connect(c.destination);
+      for (var k = 0; k < (n || 1); k++) {
+        var t = k * 0.35, o = c.createOscillator(), g = c.createGain();
+        o.frequency.value = freq || 880; o.connect(g); g.connect(c.destination);
         g.gain.setValueAtTime(0.0001, c.currentTime + t);
         g.gain.exponentialRampToValueAtTime(0.4, c.currentTime + t + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + t + 0.25);
         o.start(c.currentTime + t); o.stop(c.currentTime + t + 0.3);
-      });
+      }
     } catch (e) {}
   }
-  $('#t-plus').addEventListener('click', function () { timer.end += 15000; if (!$('#timer').classList.contains('end')) tick(); else startTimer(15); });
+  $('#t-main').addEventListener('click', function () { if (!timer.mode) startTimer(defaultRest(), 'rest'); });
+  $('#t-plus').addEventListener('click', function () { if (timer.mode && !$('#timer').classList.contains('end')) { timer.end += 15000; tick(); } });
   $('#t-stop').addEventListener('click', stopTimer);
 
   // ---------- клики ----------
@@ -928,6 +1013,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     if (tab) {
       state.active = +tab.getAttribute('data-i');
       store.set('active|' + state.data.title, state.active);
+      state.openKey = null; backIfTile();
       closePlayers();
       render();
       window.scrollTo({ top: 0 });
@@ -942,6 +1028,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     }
     if (exEl && !exEl.classList.contains('open')) { openTile(exEl); return; }
     if (exEl && t.closest('[data-act="toggle"]')) {
+      backIfTile();
       vt(function () { closeTile(exEl); }).then(function () {
         var r = exEl.getBoundingClientRect(), hh = 0;
         if (r.top < hh) window.scrollTo({ top: r.top + window.scrollY - hh - 10, behavior: 'smooth' });
@@ -956,7 +1043,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       store.set(doneKey(exD.getAttribute('data-key')), now);
       vt(function () {
         exD.classList.toggle('done', now);
-        if (now) closeTile(exD); else layoutGroup(sec);
+        if (now) { closeTile(exD); backIfTile(); } else layoutGroup(sec);
       }).then(function () {
         if (!now) return;
         var next = sec.nextElementSibling;
@@ -992,6 +1079,19 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     var act = t.closest('[data-act]');
     if (act && act.getAttribute('data-act') === 'login') { openModal(); return; }
     if (act && act.getAttribute('data-act') === 'latest') { switchWeek(''); return; }
+    if (act && act.getAttribute('data-act') === 'hold') {
+      var hsec = +act.getAttribute('data-sec'), hel = act.closest('.ex');
+      startHold(hsec, function () {
+        // вписываем время в первый пустой подход
+        var hc = hel && state.cards[hel.getAttribute('data-key')];
+        if (!hc) return;
+        var row = $$('.set', hc.el).filter(function (r) { return !$('[data-f="r"]', r).value.trim(); })[0];
+        if (!row) return;
+        $('[data-f="r"]', row).value = String(hsec);
+        hc.el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      return;
+    }
     if (act) {
       var el = act.closest('.ex');
       if (!el) return;
