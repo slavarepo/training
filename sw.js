@@ -1,6 +1,6 @@
 // Кэш самого приложения: открывается и без интернета.
 // Данные тренировки хранит страница (последняя загруженная версия).
-const CACHE = 'trener-v1';
+const CACHE = 'trener-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -13,6 +13,15 @@ self.addEventListener('activate', (e) => {
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+// Нажатие на уведомление таймера — открыть приложение
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) { if ('focus' in c) return c.focus(); }
+    return self.clients.openWindow('./');
+  }));
 });
 
 // Свои файлы: сначала сеть (чтобы обновления приходили сразу), без сети — из кэша.

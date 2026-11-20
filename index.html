@@ -299,7 +299,10 @@
   .hold-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: calc(100% - 28px); margin: 10px 14px 0; height: 52px;
     border-radius: 14px; background: var(--blue); color: #fff; font-weight: 800; font-size: 16px; }
   .hold-btn svg { width: 20px; height: 20px; }
-  .hold-btn small { font-weight: 600; opacity: .8; font-size: 12px; }
+  /* кнопка отдыха — отдельный слой анимации, всегда поверх раскрывающихся карточек */
+  .timer { view-transition-name: rest-timer; }
+  ::view-transition-group(rest-timer) { z-index: 1000; animation: none; }
+  ::view-transition-old(rest-timer), ::view-transition-new(rest-timer) { animation: none; }
   ::view-transition-group(*) { animation-duration: .34s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
   body, button, input, textarea { font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   .top h1 { font-weight: 800; letter-spacing: -.02em; }
@@ -672,7 +675,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       '<div class="body">' +
       (ex.video ? '<div class="rec-note">' + ICON_CAM + '<span>Тренер просит снять это упражнение на видео</span></div>' : '') +
       '<div class="specs">' + specs + '</div>' +
-      (hs ? '<button class="hold-btn" data-act="hold" data-sec="' + hs + '">' + ICON_TIMER + '<span>Таймер подхода · ' + hs + ' сек</span><small>старт через 5 с</small></button>' : '') +
+      (hs ? '<button class="hold-btn" data-act="hold" data-sec="' + hs + '">' + ICON_TIMER + '<span>Таймер подхода · ' + hs + ' сек</span></button>' : '') +
       (ex.note ? '<div class="tnote"><small>Тренер</small>' + esc(ex.note) + '</div>' : '') +
       (isAuth() ? '<div class="log">' + '<div class="progress"></div>' + prev +
         '<div class="sets"></div>' +
@@ -978,6 +981,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       timer.after = null;
       $('#timer').classList.add('end');
       beep(2, 880); vibrate([300, 150, 300]);
+      notify(mode === 'work' ? 'Подход окончен' : 'Отдых окончен', mode === 'work' ? 'Можно отдыхать' : 'Пора к следующему подходу');
       if (after) after();
       timer.endT = setTimeout(stopTimer, 3000);
     }
@@ -989,6 +993,19 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     idleTimer();
   }
   function vibrate(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
+  // уведомление по окончании таймера (приходит и на часы, если в Mi Fitness включено это приложение)
+  function askNotify() {
+    try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+  }
+  function notify(title, body) {
+    try {
+      if (!('Notification' in window) || Notification.permission !== 'granted' || !navigator.serviceWorker) return;
+      navigator.serviceWorker.ready.then(function (reg) {
+        return reg.showNotification(title, { body: body, tag: 'trener-timer', renotify: true, vibrate: [300, 150, 300], icon: 'icon-192.png', badge: 'icon-192.png' });
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && timer.mode) tick(); });
   function beep(n, freq) {
     var c = timer.ctx; if (!c) return;
     try {
@@ -1002,7 +1019,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
       }
     } catch (e) {}
   }
-  $('#t-main').addEventListener('click', function () { if (!timer.mode) startTimer(defaultRest(), 'rest'); });
+  $('#t-main').addEventListener('click', function () { if (!timer.mode) { askNotify(); startTimer(defaultRest(), 'rest'); } });
   $('#t-plus').addEventListener('click', function () { if (timer.mode && !$('#timer').classList.contains('end')) { timer.end += 15000; tick(); } });
   $('#t-stop').addEventListener('click', stopTimer);
 
@@ -1080,16 +1097,9 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbzqgHTb9LiPEXlqPQAZpcp4H6
     if (act && act.getAttribute('data-act') === 'login') { openModal(); return; }
     if (act && act.getAttribute('data-act') === 'latest') { switchWeek(''); return; }
     if (act && act.getAttribute('data-act') === 'hold') {
-      var hsec = +act.getAttribute('data-sec'), hel = act.closest('.ex');
-      startHold(hsec, function () {
-        // вписываем время в первый пустой подход
-        var hc = hel && state.cards[hel.getAttribute('data-key')];
-        if (!hc) return;
-        var row = $$('.set', hc.el).filter(function (r) { return !$('[data-f="r"]', r).value.trim(); })[0];
-        if (!row) return;
-        $('[data-f="r"]', row).value = String(hsec);
-        hc.el.dispatchEvent(new Event('input', { bubbles: true }));
-      });
+      var hsec = +act.getAttribute('data-sec');
+      askNotify();
+      startHold(hsec);
       return;
     }
     if (act) {
